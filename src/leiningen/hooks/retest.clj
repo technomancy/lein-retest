@@ -8,15 +8,17 @@
             (let [orig-exit-after-tests *exit-after-tests*]
               (binding [*exit-after-tests* false]
                 `(let [failures# (atom #{})]
-                   (if-let [add-hook# (resolve 'robert.hooke/add-hook)]
-                     (add-hook# (resolve 'clojure.test/report)
-                                (fn report-with-failures [report# m# & args#]
-                                  (when (#{:error :fail} (:type m#))
-                                    (swap! failures# conj
-                                           (-> clojure.test/*testing-vars*
-                                               first meta :ns ns-name)))
-                                  (apply report# m# args#)))
-                     (throw (Exception. "retest requires robert/hooke dep.")))
+                   (try (require '~'robert.hooke)
+                        ((resolve 'robert.hooke/add-hook)
+                         (resolve 'clojure.test/report)
+                         (fn report-with-failures [report# m# & args#]
+                           (when (#{:error :fail} (:type m#))
+                             (swap! failures# conj
+                                    (-> clojure.test/*testing-vars*
+                                        first meta :ns ns-name)))
+                           (apply report# m# args#)))
+                        (catch Exception _#
+                          (println "retest requires robert/hooke dep.")))
                    ~(apply form-for-testing args)
                    (spit ".lein-failures" (pr-str @failures#))
                    (if ~orig-exit-after-tests
